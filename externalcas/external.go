@@ -114,6 +114,7 @@ func (c *ExternalCAS) createLegoClient(cfg *acmeProxyConfig) (ACMEClient, error)
 	// Configure lego client
 	clientConfig := lego.NewConfig(user)
 	clientConfig.CADirURL = cfg.CaURL
+	clientConfig.Certificate.Timeout = cfg.ObtainTimeout()
 	clientConfig.HTTPClient = &http.Client{
 		Timeout: cfg.HTTPTimeout(),
 	}
