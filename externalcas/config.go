@@ -34,6 +34,12 @@ type acmeProxyConfig struct {
 	// Certificate lifetime in days (optional)
 	CertLifetime int `json:"certlifetime,omitempty"`
 
+	// Seconds to wait for the external CA to issue the certificate after the order
+	// is finalized (optional, default 30 — lego's default). Some CAs run
+	// post-finalization checks that take longer than that; must stay below
+	// RequestTimeout so the outer context still bounds the whole request.
+	CertObtainTimeout int `json:"cert_obtain_timeout,omitempty"`
+
 	// Lego provider connection variables for dns01 TXT challenge
 	Lego legoConfig `json:"dns01_txt"`
 
@@ -64,6 +70,12 @@ func (c *acmeProxyConfig) Validate() error {
 	if c.CertLifetime < 0 {
 		return errors.New("certlifetime cannot be negative")
 	}
+	if c.CertObtainTimeout < 0 {
+		return errors.New("cert_obtain_timeout cannot be negative")
+	}
+	if c.ObtainTimeout() >= c.RequestTimeout() {
+		return fmt.Errorf("cert_obtain_timeout must be less than the request timeout (%s)", c.RequestTimeout())
+	}
 
 	// Consider Metrics enabled only when port & datasource both are defined
 	if c.Metrics.Port > 0 && c.Metrics.DataSource != "" {
@@ -84,6 +96,15 @@ func (c *acmeProxyConfig) HTTPTimeout() time.Duration {
 // RequestTimeout returns the timeout for certificate request operations
 func (c *acmeProxyConfig) RequestTimeout() time.Duration {
 	return 2 * time.Minute
+}
+
+// ObtainTimeout returns how long lego waits for the external CA to issue the
+// certificate after finalization
+func (c *acmeProxyConfig) ObtainTimeout() time.Duration {
+	if c.CertObtainTimeout <= 0 {
+		return 30 * time.Second
+	}
+	return time.Duration(c.CertObtainTimeout) * time.Second
 }
 
 // parseConfig is a helper function which reads ca.json file as rawjson and validates
